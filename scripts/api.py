@@ -26,12 +26,11 @@ def _k8s_setup():
     list_of_all_nodes = v1.list_node()
     for node_map in list_of_all_nodes.items:
         node_id = node_map.metadata.name
-        print("----------", node_id)
+        print("node_name ", node_id)
         # now describe this node.
         node = v1.read_node(name=node_id)
-        #print("## ", node)
         pod = v1.list_namespaced_pod(node)
-        print("podddd ", pod)
+        print("pod  ", pod)
 
 
 if __name__ == "__main__":
