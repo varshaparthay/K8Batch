@@ -25,11 +25,19 @@ def _k8s_setup():
 
     list_of_all_nodes = v1.list_node()
     for node_map in list_of_all_nodes.items:
+        #print node_map.metadata
         node_id = node_map.metadata.name
         print("node_name ", node_id)
         # now describe this node.
         node = v1.read_node(name=node_id)
-        pod = v1.list_namespaced_pod(node)
+        #print("node_name ", node)
+        '''
+        field_selector = {
+            'metadata.name': node_id
+        }
+        '''
+        field_selector = "spec.nodeName="+node_id
+        pod = v1.list_namespaced_pod("pdx", field_selector=field_selector)
         print("pod  ", pod)
 
 
