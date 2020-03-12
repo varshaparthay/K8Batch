@@ -66,16 +66,17 @@ def _k8s_setup():
         for item in node_resource_percentage:
             resource_usage_per_pod.append(item)
         # break after a node to iterate faster
-        if len(node_utilization) > 0:
-            break
+        # if len(node_utilization) > 0:
+        #    break
 
-    #export resource usage per pods to a csv file
+    # export resource usage per pods to a csv file
     fields = ['pod_name', 'cpu_usage', 'memory_usage', 'cpu_cost', 'memory_cost']
     filename = "/tmp/node_resource_file.csv"
     with open(filename, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fields)
         writer.writeheader()
         writer.writerows(resource_usage_per_pod)
+
 
 def normalize_measurement(value, res_type):
     if value == 0:
@@ -89,7 +90,8 @@ def normalize_measurement(value, res_type):
     elif res_type == "memory":
         # to ki
         conversion_table_i = {'Ei': 2 ** 50, 'Pi': 2 ** 40, 'Ti': 2 ** 30, 'Gi': 2 ** 20, 'Mi': 2 ** 10, 'Ki': 1}
-        conversion_table = {'E': 10 ** 15, 'P': 10 ** 12, 'T': 10 ** 9, 'G': 10 ** 6, 'M': 10 ** 3, 'K': 1, 'm': 10 ** -6}
+        conversion_table = {'E': 10 ** 15, 'P': 10 ** 12, 'T': 10 ** 9, 'G': 10 ** 6, 'M': 10 ** 3, 'K': 1,
+                            'm': 10 ** -6}
         conversion_ratio = 1
         numeric_value = 0
         if value[-1] == 'i':
@@ -122,7 +124,7 @@ def compute_node_utilization(v1, node_map):
         node = v1.read_node(name=node_id)
     except kubernetes.client.rest.ApiException:
         # todo: add retries, etc
-        return []
+        return [],[]
     '''
     field_selector = {
         'metadata.name': node_id,
@@ -134,12 +136,12 @@ def compute_node_utilization(v1, node_map):
         pods = v1.list_namespaced_pod("prod", field_selector=field_selector)
     except:
         # todo: better handle of errors
-        return []
+        return [],[]
 
     # fetch limits and requested resources from k8s
     node_resources_table = []
     node_resource_percentages = []  # type: List[Dict[str, float]]
-    total_cpu_cost_of_pod, total_memory_cost_of_pod = 0,0
+    total_cpu_cost_of_pod, total_memory_cost_of_pod = 0, 0
     for pod in pods.items:
         total_memory_requested_by_pod, total_cpu_requested_by_pod = 0, 0
         resources = []
@@ -197,11 +199,15 @@ def compute_node_utilization(v1, node_map):
         # find the right pod and update dictionary
         for resource in node_resource_percentages:
             if str(resource['pod_name']) == str(name):
-                resource['cpu_cost'] = (total_cpu_requested_by_pod/total_cpu_cost_of_pod) * 100
-                resource['memory_cost'] = (total_memory_requested_by_pod/total_memory_cost_of_pod) * 100
+                resource['cpu_cost'] = (
+                                                   total_cpu_requested_by_pod / total_cpu_cost_of_pod) * 100 if total_cpu_cost_of_pod != 0 else 0
+                resource['memory_cost'] = (
+                                                      total_memory_requested_by_pod / total_memory_cost_of_pod) * 100 if total_memory_cost_of_pod != 0 else 0
 
+    print("return ", node_resources_table, node_resource_percentages)
     return node_resources_table, node_resource_percentages
 
 
 if __name__ == "__main__":
-    print("time taken to compute 1 pod resources", timeit.timeit(_k8s_setup, number=1))
+    # print("time taken to compute 1 pod resources", timeit.timeit(_k8s_setup, number=1))
+    _k8s_setup()
