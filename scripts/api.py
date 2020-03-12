@@ -119,18 +119,18 @@ def compute_node_utilization(v1, node_map):
     print("Processing node ", node_id)
     total_memory_capacity_of_a_node = normalize_measurement(node_map.status.allocatable['memory'], "memory")
     total_cpu_capacity_of_a_node = normalize_measurement(node_map.status.allocatable['cpu'], "cpu")
-
+    '''
     try:
         node = v1.read_node(name=node_id)
     except kubernetes.client.rest.ApiException:
         # todo: add retries, etc
         return [],[]
-    '''
     field_selector = {
         'metadata.name': node_id,
         'metadata.labels.stack'='avingestmagna--1-0-464--dmf72t87',
     }
     '''
+
     field_selector = "spec.nodeName=" + node_id
     try:
         pods = v1.list_namespaced_pod("prod", field_selector=field_selector)
@@ -204,7 +204,7 @@ def compute_node_utilization(v1, node_map):
                 resource['memory_cost'] = (
                                                       total_memory_requested_by_pod / total_memory_cost_of_pod) * 100 if total_memory_cost_of_pod != 0 else 0
 
-    print("return ", node_resources_table, node_resource_percentages)
+    #print("return ", node_resources_table, node_resource_percentages)
     return node_resources_table, node_resource_percentages
 
 
