@@ -66,11 +66,11 @@ def _k8s_setup():
         for item in node_resource_percentage:
             resource_usage_per_pod.append(item)
         # break after a node to iterate faster
-        #if len(node_utilization) > 1:
-        #    break
+        if len(node_utilization) > 0:
+            break
 
     #export resource usage per pods to a csv file
-    fields = ['pod_name', 'cpu_usage', 'memory_usage']
+    fields = ['pod_name', 'cpu_usage', 'memory_usage', 'cpu_cost', 'memory_cost']
     filename = "/tmp/node_resource_file.csv"
     with open(filename, 'w') as csvfile:
         writer = csv.DictWriter(csvfile, fieldnames=fields)
@@ -114,7 +114,7 @@ def compute_node_utilization(v1, node_map):
     # fetch request resources/limits from the node
 
     node_id = node_map.metadata.name
-    print("Processing node - ", node_id)
+    print("Processing node ", node_id)
     total_memory_capacity_of_a_node = normalize_measurement(node_map.status.allocatable['memory'], "memory")
     total_cpu_capacity_of_a_node = normalize_measurement(node_map.status.allocatable['cpu'], "cpu")
 
@@ -139,6 +139,7 @@ def compute_node_utilization(v1, node_map):
     # fetch limits and requested resources from k8s
     node_resources_table = []
     node_resource_percentages = []  # type: List[Dict[str, float]]
+    total_cpu_cost_of_pod, total_memory_cost_of_pod = 0,0
     for pod in pods.items:
         total_memory_requested_by_pod, total_cpu_requested_by_pod = 0, 0
         resources = []
@@ -159,6 +160,10 @@ def compute_node_utilization(v1, node_map):
             total_memory_requested_by_pod += memory_requested_by_pod
             total_cpu_requested_by_pod += cpu_requested_by_pod
 
+            ## Compute total cost of cpu and memory for all pods in a node
+            total_cpu_cost_of_pod += cpu_requested_by_pod
+            total_memory_cost_of_pod += memory_requested_by_pod
+
             resources.append((
                 cpu_requested_by_pod,
                 memory_requested_by_pod,
@@ -172,6 +177,28 @@ def compute_node_utilization(v1, node_map):
         percentages['memory_usage'] = (total_memory_requested_by_pod / float(total_memory_capacity_of_a_node)) * 100
         percentages['cpu_usage'] = (total_cpu_requested_by_pod / float(total_cpu_capacity_of_a_node)) * 100
         node_resource_percentages.append(percentages)
+
+    '''
+    Compute cost per pod now, 
+    this is not the most effective way to compute cost, but taking a first stab
+    '''
+
+    for pod in pods.items:
+        total_memory_requested_by_pod, total_cpu_requested_by_pod = 0, 0
+        name = pod.metadata.name
+        for container in pod.spec.containers:
+            cont_res_req = container.resources.requests
+            cpu_requested_by_pod = get_or_default(cont_res_req, 'cpu')
+            memory_requested_by_pod = get_or_default(cont_res_req, 'memory')
+            ## Compute total memory and cpu requested by all containers in a pod
+            total_memory_requested_by_pod += memory_requested_by_pod
+            total_cpu_requested_by_pod += cpu_requested_by_pod
+
+        # find the right pod and update dictionary
+        for resource in node_resource_percentages:
+            if str(resource['pod_name']) == str(name):
+                resource['cpu_cost'] = (total_cpu_requested_by_pod/total_cpu_cost_of_pod) * 100
+                resource['memory_cost'] = (total_memory_requested_by_pod/total_memory_cost_of_pod) * 100
 
     return node_resources_table, node_resource_percentages
 
